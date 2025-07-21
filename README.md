@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>RR Task Processor</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --secondary: #ef4444;
+            --success: #22c55e;
+        }
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            margin: 2rem;
+            background: #f0f2f5;
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 30px;
+        }
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+        .task-item {
+            padding: 1.25rem;
+            margin: 1rem 0;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            transition: transform 0.2s ease;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 15px;
+        }
+        input, textarea {
+            padding: 0.75rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        button {
+            background-image: linear-gradient(to right, var(--primary), #6366f1);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .memo-panel {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            height: calc(100vh - 4rem);
+            position: sticky;
+            top: 2rem;
+        }
+        .ice-score {
+            color: #3b82f6;
+            font-weight: 600;
+        }
+        .time-remaining {
+            color: #d97706;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 1rem;">
+            <input type="text" id="appNameInput" placeholder="输入你的应用名称" style="flex: 1;">
+            <button onclick="saveAppName()" style="padding: 0.5rem 1rem;">保存名称</button>
+        </div>
+        <h2 id="appTitle">RR Task Processor</h2>
+        <form id="taskForm">
+            <input type="text" id="taskContent" placeholder="Task content" required>
+            <input type="number" min="1" max="10" placeholder="Impact (I)" required>
+            <input type="number" min="1" max="10" placeholder="Confidence (C)" required>
+            <input type="number" min="1" max="10" placeholder="Ease (E)" required>
+            <input type="number" min="1" placeholder="Minutes" required>
+            <button type="submit">Add Task</button>
+        </form>
+        <div id="taskList" style="margin-top: 2rem;"></div>
+        <div style="margin-top: 2rem;">
+            <div style="cursor: pointer; color: var(--primary); margin-top: 1rem;" onclick="toggleCompleted()">
+                ▼ 已完成任务（<span id="completedCount">0</span>）
+            </div>
+            <div id="completedList" style="display: none; margin-top: 1rem;"></div>
+        </div>
+    </div>
+    <div class="memo-panel">
+        <h3>Quick Memo</h3>
+        <textarea id="memoInput" placeholder="Type memo..." rows="3" style="width: 100%; height: 446px;"></textarea>
+        <button onclick="addMemo()">Save Memo</button>
+        <div id="memoList" style="margin-top: 1.5rem;"></div>
+    </div>
+    <script>
+        class RRTaskProcessor {
+            constructor() {
+                this.tasks = [];
+                // 从本地存储加载已完成任务
+                this.completed = JSON.parse(localStorage.getItem('completedTasks')) || [];
+                this.memos = [];
+                setInterval(() => this.render(), 1000);
+            }
+
+            createTask(content, impact, confidence, ease, duration) {
+                // 修正ICE计算逻辑：(I×C)/E（保留1位小数）
+                const iceScore = ((+impact * +confidence) / +ease).toFixed(1);
+                const task = {
+                    id: Date.now(),
+                    content: content.trim(),
+                    ice: `ICE ${iceScore}`,
+                    endTime: Date.now() + duration * 60000,
+                };
+                this.tasks.push(task);
+                this.render();
+            }
+
+            formatTime(timestamp) {
+                const diff = timestamp - Date.now();
+                return diff > 0 ? `${Math.floor(diff / 60000)}分钟` : '已超时';
+            }
+
+            render() {
+                document.getElementById('taskList').innerHTML = this.tasks.map(task => `
+                    <div class="task-item">
+                        <div>${task.content}</div>
+                        <div style="margin-top: 0.5rem;">
+                            <span class="ice-score">${task.ice}</span>
+                            <span class="time-remaining">剩余${this.formatTime(task.endTime)}</span>
+                        </div>
+                        <div>
+                            <button onclick="sys.completeTask(${task.id})" style="background:var(--success)">完成</button>
+                            <button onclick="if(confirm('确认删除？')) sys.removeTask(${task.id})" style="background:var(--secondary)">删除</button>
+                        </div>
+                    </div>
+                `).join('');
+
+                // 渲染已完成任务
+                document.getElementById('completedList').innerHTML = this.completed.map(task => `
+                    <div class="task-item" style="opacity: 0.7;">
+                        <div>${task.content}</div>
+                        <div style="margin-top: 0.5rem;">
+                            <span class="ice-score">${task.ice}</span>
+                            <span>已完成</span>
+                            <button onclick="sys.removeCompletedTask(${task.id})" style="background:var(--secondary); padding: 0.25rem 0.75rem; margin-left: 1rem;">删除记录</button>
+                        </div>
+                    </div>
+                `).join('');
+
+                // 更新已完成任务数量
+                document.getElementById('completedCount').textContent = this.completed.length;
+            }
+
+            completeTask(id) {
+                const index = this.tasks.findIndex(t => t.id === id);
+                if (index > -1) {
+                    this.completed.push(this.tasks[index]);
+                    this.tasks.splice(index, 1);
+                    // 保存已完成任务到本地存储
+                    localStorage.setItem('completedTasks', JSON.stringify(this.completed));
+                    this.render();
+                }
+            }
+
+            // 删除历史记录
+            removeCompletedTask(id) {
+                this.completed = this.completed.filter(t => t.id !== id);
+                // 保存已完成任务到本地存储
+                localStorage.setItem('completedTasks', JSON.stringify(this.completed));
+                this.render();
+            }
+
+            removeTask(id) {
+                const index = this.tasks.findIndex(t => t.id === id);
+                if (index > -1) {
+                    this.tasks.splice(index, 1);
+                    this.render();
+                }
+            }
+        }
+
+        // 初始化应用名称
+        function saveAppName() {
+            const name = document.getElementById('appNameInput').value.trim();
+            localStorage.setItem('appName', name || '我的任务处理器');
+            document.getElementById('appTitle').textContent = name || '我的任务处理器';
+        }
+        // 加载保存的应用名称
+        const savedName = localStorage.getItem('appName') || '我的任务处理器';
+        document.getElementById('appTitle').textContent = savedName;
+        document.getElementById('appNameInput').value = savedName;
+
+        const sys = new RRTaskProcessor();
+
+        // 表单提交事件
+        document.getElementById('taskForm').addEventListener('submit', e => {
+            e.preventDefault();
+            const elems = e.target.elements;
+            sys.createTask(
+                elems.taskContent.value,
+                elems[1].value,
+                elems[2].value,
+                elems[3].value,
+                elems[4].value
+            );
+            e.target.reset();
+        });
+
+        // 切换已完成任务显示
+        function toggleCompleted() {
+            const list = document.getElementById('completedList');
+            list.style.display = list.style.display === 'none' ? 'block' : 'none';
+        }
+
+        // 备忘录功能
+        function addMemo() {
+            const memoText = document.getElementById('memoInput').value.trim();
+            if (memoText) {
+                sys.memos.push({ id: Date.now(), text: memoText });
+                document.getElementById('memoList').innerHTML += `
+                    <div class="task-item" style="padding: 0.75rem;">
+                        ${memoText}
+                        <button onclick="removeMemo(${Date.now()})" style="background:var(--secondary); padding: 0.25rem 0.75rem;">删除</button>
+                    </div>
+                `;
+                document.getElementById('memoInput').value = '';
+            }
+        }
+
+        function removeMemo(id) {
+            sys.memos = sys.memos.filter(m => m.id !== id);
+            // 重新渲染备忘录列表（简化实现，实际可优化为精确删除）
+            document.getElementById('memoList').innerHTML = sys.memos.map(memo => `
+                <div class="task-item" style="padding: 0.75rem;">
+                    ${memo.text}
+                    <button onclick="removeMemo(${memo.id})" style="background:var(--secondary); padding: 0.25rem 0.75rem;">删除</button>
+                </div>
+            '.join(');
+        }
+    </script>
+</>
