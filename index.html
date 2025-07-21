@@ -160,6 +160,8 @@
                 if (index > -1) {
                     this.completed.push(this.tasks[index]);
                     this.tasks.splice(index, 1);
+                    // 保存活跃任务到本地存储
+                    localStorage.setItem('activeTasks', JSON.stringify(this.tasks));
                     // 保存已完成任务到本地存储
                     localStorage.setItem('completedTasks', JSON.stringify(this.completed));
                     this.render();
@@ -178,6 +180,8 @@
                 const index = this.tasks.findIndex(t => t.id === id);
                 if (index > -1) {
                     this.tasks.splice(index, 1);
+                    // 保存活跃任务到本地存储
+                    localStorage.setItem('activeTasks', JSON.stringify(this.tasks));
                     this.render();
                 }
             }
@@ -185,62 +189,63 @@
 
         // 初始化应用名称
         function saveAppName() {
-            const name = document.getElementById('appNameInput').value.trim();const name = document.getElementById('appNameInput').value.trim();
-            localStorage.setItem('appName', name || '我的任务处理器');localStorage.setItem('appName', name || '我的任务处理器');
-            document.getElementById('appTitle').textContent = name || '我的任务处理器';document.getElementById('appTitle').textContent = name || '我的任务处理器';
-        }}
-        // 加载保存的应用名称// 加载保存的应用名称
-        const savedName = localStorage.getItem('appName') || '我的任务处理器';const savedName = localStorage.getItem('appName') || '我的任务处理器';
-        document.getElementById('appTitle').textContent = savedName;document.getElementById('appTitle').textContent = savedName;
-        document.getElementById('appNameInput').value = savedName;document.getElementById('appNameInput').value = savedName;
+            const name = document.getElementById('appNameInput').value.trim();
+            localStorage.setItem('appName', name || '我的任务处理器');
+            document.getElementById('appTitle').textContent = name || '我的任务处理器';
+        }
+        // 加载保存的应用名称
+        const savedName = localStorage.getItem('appName') || '我的任务处理器';
+        document.getElementById('appTitle').textContent = savedName;
+        document.getElementById('appNameInput').value = savedName;
 
-        const sys = new RRTaskProcessor();const sys = new RRTaskProcessor();
+        const sys = new RRTaskProcessor();
 
-        // 表单提交事件// 表单提交事件
-        document.getElementById('taskForm').addEventListener('submit', e => {document.getElementById('taskForm').addEventListener('submit', e => {
-            e.preventDefault();e.preventDefault();
-            const elems = e.target.elements;const elems = e.target.elements;
-            sys.createTask(sys.createTask(
-                elems.taskContent.valueelems.taskContent.value,
-                elems[1].value,elems[1].value,
-                elems[2].value,elems[2].value,
-                elems[3].value,elems[3].value,
-                elems[4].valueelems[4].value
-            ););
-            e.target.reset();e.target.reset();
-        });});
+        // 表单提交事件
+        document.getElementById('taskForm').addEventListener('submit', e => {
+            e.preventDefault();
+            const elems = e.target.elements;
+            sys.createTask(
+                elems.taskContent.value,
+                elems[1].value,
+                elems[2].value,
+                elems[3].value,
+                elems[4].value
+            );
+            e.target.reset();
+        });
 
-        // 切换已完成任务显示// 切换已完成任务显示
-        function toggleCompleted() {function toggleCompleted() {
-            const list = document.getElementById('completedList');const list = document.getElementById('completedList');
-            list.style.display = list.style.display === 'none' ? 'block' : 'none';list.style.display = list.style.display === 'none' ? 'block' : 'none';
-        }}
+        // 切换已完成任务显示
+        function toggleCompleted() {
+            const list = document.getElementById('completedList');
+            list.style.display = list.style.display === 'none' ? 'block' : 'none';
+        }
 
-        // 备忘录功能// 备忘录功能
-        功能添加备注() {function addMemo() {
-            const memoText = document.getElementById('memoInput').value.trim();const memoText = document.getElementById('memoInput').value.trim();
-            if (memoText) {if (memoText) {
-                sys.memos.push({ id: Date.now(), text: memoText });sys.memos.push({ id: Date.now(), text: memoText });
-                document.getElementById('memoList').innerHTML += `document.getElementById('memoList').innerHTML += `
+        // 备忘录功能
+        function addMemo() {
+            const memoText = document.getElementById('memoInput').value.trim();
+            if (memoText) {
+                const newMemoId = Date.now();
+                sys.memos.push({ id: newMemoId, text: memoText });
+                document.getElementById('memoList').innerHTML += `
                     <div class="task-item" style="padding: 0.75rem;">
                         ${memoText}
-                        <button onclick="removeMemo(${Date                        <button onclick="removeMemo(${Date.now()})" style="background:var(--secondary); padding: 0.25rem 0.75rem;">删除</button>now()})" style="background:var(--secondary); padding: 0.25rem 0.75rem;">删除</button>
+                        <button onclick="removeMemo(${newMemoId})" style="background:var(--secondary); padding: 0.25rem 0.75rem;">删除</button>
                     </div>
-                `                输入的文本为空，没有可显示的内容。
-                document.getElementById('memoInput').value = '';document.getElementById('memoInput').value = '';
-            }}
-        }}
+                `;
+                document.getElementById('memoInput').value = '';
+            }
+        }
 
-        功能移除备注(id) {function removeMemo(id) {
-            sys.memos = sys.memos.filter(m => m.id !== id);sys.memos = sys.memos.filter(m => m.id !== id);
-            // 重新渲染备忘录列表（简化实现，实际可优化为精确删除）// 重新渲染备忘录列表（简化实现，实际可优化为精确删除）
-            document.getElementById('memoList').innerHTML = sys.memos.map(memo => `document.getElementById('memoList').innerHTML = sys.memos.map(memo => `
+        function removeMemo(id) {
+            sys.memos = sys.memos.filter(m => m.id !== id);
+            // 重新渲染备忘录列表（简化实现，实际可优化为精确删除）
+            document.getElementById('memoList').innerHTML = sys.memos.map(memo => `
                 <div class="task-item" style="padding: 0.75rem;">
-                    ${memo                    ${memo.text}text}
-                    <button onclick="removeMemo(${memo                    <button onclick="removeMemo(${memo.id})" style="background:var(--secondary); padding: 0.25rem 0.75rem;">删除</button>id})" style="background:var(--secondary); padding: 0.25rem 0.75rem;">删除</button>
+                    ${memo.text}
+                    <button onclick="removeMemo(${memo.id})" style="background:var(--secondary); padding: 0.25rem 0.75rem;">删除</button>
                 </div>
-            `)            ).join('');join('');
-        }}
-    </脚本>
-</主体>
-      </html>
+            `).join('');
+        }
+    </script>
+</body>
+</html>
